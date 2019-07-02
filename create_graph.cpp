@@ -45,7 +45,7 @@ std::vector<std::vector<std::string> > CSVReader::getData()
 int main()
 {
     // Creating an object of CSVWriter
-    CSVReader reader("example.csv");
+    CSVReader reader("/home/arjun/ssd/sps/data/fullDataMerged.csv");
     // Get the data from CSV File
     std::vector<std::vector<std::string> > dataList = reader.getData();
     // Print the content of row by row on screen
