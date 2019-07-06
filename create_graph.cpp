@@ -8,8 +8,9 @@
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/expressions.hpp>
+#include "utils.h"
 #include "Node.h"
-#include "Graph.h"
+#include "CourseProgressionGraph.h"
 #include "CSVReader.cpp"
 
 namespace logging = boost::log;
@@ -53,11 +54,19 @@ int main()
     df_full.erase(df_full.begin());
 
     // Create root node for flow graph
-    Node root("START");
-    Node end("END");
+    Node::Data root_data=Node::Data();
+    root_data.label = "ROOT";
+    root_data.node_id = 0;
 
-    // Create Graph with root and end
-    Graph graph(&root, &end);
+    Node::Data end_data = Node::Data();
+    end_data.label = "END";
+    end_data.node_id = 1;
+    
+    Node root(root_data);
+    Node end(end_data);
+
+    // Create CourseProgressionGraph with root and end
+    CourseProgressionGraph graph(&root, &end);
 
     // Read sps id list
     std::string a;
@@ -67,7 +76,7 @@ int main()
     i=0;
     while (infile >> a)
     {
-        BOOST_LOG_TRIVIAL(info)<<++i<<"/"<<number_of_students<<" : "<<a;
+        BOOST_LOG_TRIVIAL(info)<<++i<<"/"<<number_of_students<<" : "<<a<<" progress--------------------------------------";
         std::vector<std::vector<std::string> > studentCourseData;
         // studentCourseData.push_back(df_full[0]);
         std::copy_if(df_full.begin(), df_full.end(), std::back_inserter(studentCourseData), [a](std::vector<std::string> row){return row[16].compare(a) == 0;});
@@ -94,7 +103,11 @@ int main()
                 }
                 
                 BOOST_LOG_TRIVIAL(trace)<<"Adding node...";
-                prev_node = graph.addNode(a, current_node, course[3], sequence_number);
+                Node::Data course_data = Node::Data();
+                course_data.label = course[3];
+                course_data.node_id = stoll(course[4]);
+
+                prev_node = graph.addNode(a, current_node, course_data, sequence_number, true);
                 BOOST_LOG_TRIVIAL(trace)<<"Add node complete";
                 make_transition=false;
             
@@ -107,16 +120,21 @@ int main()
             BOOST_LOG_TRIVIAL(fatal)<<"Courses filtered for students does not contain any record";
             throw;
         }
-        if(i==20){
-            break;
-        }
+        // if(i==100){
+        //     break;
+        // }
         // break;    
     }
     BOOST_LOG_TRIVIAL(debug)<<"Creating graph Done";
 
-    BOOST_LOG_TRIVIAL(debug)<<"Showing BFS output...";
-    graph.bfsParse();
-    BOOST_LOG_TRIVIAL(debug)<<"BFS output done...";
+    // BOOST_LOG_TRIVIAL(debug)<<"Showing BFS output...";
+    // graph.bfsParse();
+    // BOOST_LOG_TRIVIAL(debug)<<"BFS output done...";
+
+    graph.initializeGraph();
+
+    BOOST_LOG_TRIVIAL(info)<<"Creating dot file...";
+    graph.printGraph();
 
     BOOST_LOG_TRIVIAL(info)<<"Done";
     return 0;

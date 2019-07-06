@@ -10,14 +10,14 @@ LXXFLAGS = -lpthread -lboost_log -lboost_system
 # ****************************************************
 # Targets needed to bring the executable up to date
 
-create_graph: create_graph.o Node.o Graph.o
-	$(CXX) Node.o Graph.o create_graph.o $(LXXFLAGS) -o a.out
+create_graph: create_graph.o Node.o CourseProgressionGraph.o utils.o
+	$(CXX) utils.o Node.o CourseProgressionGraph.o create_graph.o $(LXXFLAGS) -o a.out
 
 # The main.o target can be written more simply
 
-create_graph.o: create_graph.cpp Node.h Graph.h
-	$(CXX) $(CXXFLAGS) -c Node.cpp Graph.cpp create_graph.cpp
+create_graph.o: create_graph.cpp utils.h Node.h CourseProgressionGraph.h
+	$(CXX) $(CXXFLAGS) -c utils.cpp Node.cpp CourseProgressionGraph.cpp create_graph.cpp
 
 Node.o: Node.h
 
-Graph.o: Graph.h Node.h
+CourseProgressionGraph.o: CourseProgressionGraph.h Node.h utils.h

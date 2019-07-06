@@ -10,15 +10,20 @@
 class Node
 {
     public:
-        std::string label;
-        int sequence_number;
+        struct Data{
+            std::string label;
+            uint node_id;
+        }data;
+        // std::string label;
+        // uint node_id;
+        uint sequence_number;
         std::vector<std::string> students;
         std::vector<Node*> children;
         std::vector<Node*> parents;
 
     // public:
-        Node(std::string name);
-        Node(std::string name, int sequencep);
+        Node(Node::Data incoming);
+        Node(Node::Data incoming, int sequencep);
 
         // Getter functions
         std::string getLabel();
@@ -30,4 +35,5 @@ class Node
         bool addStudent(std::string id);
         bool addChildNode(Node* obj);
         bool addParentNode(Node* obj);
+        bool memberOf(Node* obj, std::vector<Node*> vec);
 };
