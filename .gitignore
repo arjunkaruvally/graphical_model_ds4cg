@@ -34,3 +34,4 @@
 .vscode
 results
 debug
+*.swp
