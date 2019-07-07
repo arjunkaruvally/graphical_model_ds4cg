@@ -40,6 +40,7 @@ bool Node::addStudents(std::vector<std::string> ids){
         if(!memberOf(id, this->data.students)){
             this->data.students.push_back(id);
             BOOST_LOG_TRIVIAL(trace)<<"added to list";
+            continue;
         }
         BOOST_LOG_TRIVIAL(trace)<<"duplicate exist";
     }
@@ -74,7 +75,7 @@ bool Node::memberOf(std::string obj, std::vector<std::string> vec){
 bool Node::memberOf(Node* obj, std::vector<Node*> vec){
     BOOST_LOG_TRIVIAL(trace)<<"Calculating memberOf<Node*>";
     for(Node* member : vec){
-        BOOST_LOG_TRIVIAL(trace)<<"comparing "<<member->data.label<<" and "<<obj->data.label;
+        BOOST_LOG_TRIVIAL(trace)<<"comparing "<<member->data.label<<"-"<<member->data.node_id<<" and "<<obj->data.label<<"-"<<obj->data.node_id;
         if(member->data.node_id==obj->data.node_id){
             return true;
         }
@@ -83,10 +84,11 @@ bool Node::memberOf(Node* obj, std::vector<Node*> vec){
 }
 
 bool Node::addChildNode(Node* obj){
-    BOOST_LOG_TRIVIAL(trace)<<"Adding child node: "<<obj->getLabel()<<" in parent: "<<data.label<<"...";
+    BOOST_LOG_TRIVIAL(trace)<<"Adding child node: "<<obj->getLabel()<<"-"<<obj->data.node_id<<" in parent: "<<data.label<<"-"<<data.node_id<<"...";
     if(!memberOf(obj, children)){
         BOOST_LOG_TRIVIAL(trace)<<"Child Added";
         children.push_back(obj);
+        obj->parents.push_back(this);
         return true;
     }
     BOOST_LOG_TRIVIAL(trace)<<"Duplicate detected";

@@ -112,20 +112,22 @@ Node* CourseProgressionGraph::bfsSearch(Node::Data data){
 }
 
 
-Node* CourseProgressionGraph::addNode(std::string student_id, Node* current_node, Node::Data data, int sequence_number, bool full_match=false, bool successful=false){
+Node* CourseProgressionGraph::addNode(std::string student_id, std::vector<Node*> current_nodes, Node::Data data, int sequence_number, bool full_match=false, bool successful=false){
     Node* node=NULL;
     BOOST_LOG_TRIVIAL(trace)<<"Step 1: Searching for existing nodes";
     ///////// Step 1: Search for the node
-    std::vector<Node*> node_children=current_node->getAllChildren();
 
     if(!full_match){
-        for(uint i=0; i<node_children.size(); i++){
-            Node* child=node_children[i];
-            BOOST_LOG_TRIVIAL(trace)<<"Comparing "<<child->getLabel()<<" with "<<data.label;
-            if(child->data.node_id==data.node_id){
-                BOOST_LOG_TRIVIAL(trace)<<"Match Found";
-                node=child;
-                break;
+        for(Node* current_node : current_nodes){
+            std::vector<Node*> node_children=current_node->getAllChildren();
+            for(uint i=0; i<node_children.size(); i++){
+                Node* child=node_children[i];
+                BOOST_LOG_TRIVIAL(trace)<<"Comparing "<<child->getLabel()<<" with "<<data.label;
+                if(child->data.node_id==data.node_id){
+                    BOOST_LOG_TRIVIAL(trace)<<"Match Found";
+                    node=child;
+                    break;
+                }
             }
         }
     } else {
@@ -135,7 +137,7 @@ Node* CourseProgressionGraph::addNode(std::string student_id, Node* current_node
     BOOST_LOG_TRIVIAL(trace)<<"Step 2: Creating and adding node if not found";
     ///////// Step 2: create and add node to graph if not found
     if(node==NULL){
-        BOOST_LOG_TRIVIAL(trace)<<"no node from step 1, creating new node for "<<data.label<<"...";
+        BOOST_LOG_TRIVIAL(trace)<<"no node from step 1, creating new node for "<<data.label<<"-"<<data.node_id<<"...";
         node = new Node(data);
 
         //Sanitize dot file
@@ -156,14 +158,27 @@ Node* CourseProgressionGraph::addNode(std::string student_id, Node* current_node
     BOOST_LOG_TRIVIAL(trace)<<"Step 3: Making changes to graph...";;
 
     //////// Step 3: do necessary modifications to graph
-    if(current_node->addChildNode(node)){
-        edge_array.push_back(Edge(current_node->data.node_id, node->data.node_id));
+    for(Node* current_node : current_nodes){
+        BOOST_LOG_TRIVIAL(trace)<<"Adding child to: "<<current_node->data.label<<"-"<<current_node->data.node_id;
+        current_node->addChildNode(node);
     }
-    
 
     BOOST_LOG_TRIVIAL(trace)<<"CourseProgressionGraph::addNode() done";
     // return pointer to node
     return node;
+}
+
+
+void CourseProgressionGraph::connectEND(std::string sid, std::vector<Node*> nodes, bool successful){
+    BOOST_LOG_TRIVIAL(trace)<<"Connecting to END  for "<<sid;
+    end->addStudents(std::vector<std::string>(1, sid));
+    if(successful){
+        end->addSuccessfulStudent(sid);
+    }
+
+    for(Node* node : nodes){
+        if(node->addChildNode(end));
+    }
 }
 
 
@@ -172,10 +187,19 @@ void CourseProgressionGraph::wrap_up(){
     for(auto const& x : vertex_dict){
         Node* node=x.second;
 
-        if(node->children.size()==0 || (node->children.size()==1 && (node->children[0]->data.node_id == node->data.node_id))){
-            end->addStudents(std::vector<std::string>(1, node->data.label));
+        for(Node* child : node->children){
+            BOOST_LOG_TRIVIAL(trace)<<"(wrap up)adding edge: "<<node->data.node_id<<" -> "<<child->data.node_id;
+            edge_array.push_back(Edge(node->data.node_id, child->data.node_id));
+        }
+
+        if(node->data.label.compare("ROOT")!=0 &&
+            node->data.label.compare("END")!=0 && 
+            (node->children.size()==0 || 
+            (node->children.size()==1 &&
+             (node->children[0]->data.node_id == node->data.node_id))))
+        {
             node->addChildNode(end);
-            edge_array.push_back(Edge(node->data.node_id, end->data.node_id));
+            // edge_array.push_back(Edge(node->data.node_id, end->data.node_id));
         }
     }
 }
@@ -187,9 +211,9 @@ void CourseProgressionGraph::initializeGraph(){
 
     BOOST_LOG_TRIVIAL(debug)<<"Edges to add: "<<edge_array.size();
     for(Edge edge : edge_array){
-        BOOST_LOG_TRIVIAL(trace)<<"adding edge: "<<edge.first<<" -> "<<edge.second;
+        // BOOST_LOG_TRIVIAL(trace)<<"adding edge: "<<edge.first<<" -> "<<edge.second;
         // add_edge(edge.first, edge.second, this->boost_graph);
-        BOOST_LOG_TRIVIAL(trace)<<"adding edge done";
+        // BOOST_LOG_TRIVIAL(trace)<<"adding edge done";
         // std::cout<<edge.first<<" -> "<<edge.second<<";"<<std::endl;
     }
     BOOST_LOG_TRIVIAL(trace)<<"Graph visualization done";
@@ -199,6 +223,21 @@ void CourseProgressionGraph::initializeGraph(){
 void CourseProgressionGraph::nodeDOT(std::ofstream &dot_file){
     std::vector<Node*> node_list = getBfsParse();
 
+    dot_file<<"LEGEND"<<" [ shape=none"
+                                <<", style=filled"
+                                <<", fontcolor=black"
+                                <<", fillcolor=\"#ffffff\""
+                                <<", label=<"
+                                <<"<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\">"
+                                    <<"<TR>"
+                                        <<"<TD>course ID</TD><TD COLSPAN=\"2\">Course Name</TD>"
+                                    <<"</TR>"
+                                    <<"<TR>"
+                                        <<"<TD>Total Successful</TD><TD>Total students</TD><TD>Success Rate</TD>"
+                                    <<"</TR>"
+                                <<"</TABLE>>"
+                                <<"];"<<std::endl;
+
     for(auto const& x : vertex_dict){
         Node* s = x.second;
         sanitizeDOTEntry(s->data.label);
@@ -206,30 +245,87 @@ void CourseProgressionGraph::nodeDOT(std::ofstream &dot_file){
         std::stringstream colour_code_stream;
         std::string colour_code;
 
-        colour_code_stream<<"#";
-
         BOOST_LOG_TRIVIAL(trace)<<"Node: "<<s->data.label<<"_"<<s->data.node_id<<" success_rate: "<<success_rate<<" total_succ: "
                             <<s->data.students_successful.size()<<" total_students: "<<s->data.students.size();
 
         if(success_rate<=33){
+            colour_code_stream<<"#";
+            // colour_code_stream << "0 ";
             BOOST_LOG_TRIVIAL(trace)<<"colour index red: "<<(int)(255-(success_rate*255/33));
-            colour_code_stream << std::hex << (int)(255-(success_rate*255/33));
-            colour_code_stream << "0000";
+            // colour_code_stream << std::hex << (int)(255-(success_rate*255/33));
+            // colour_code_stream << "0000";
+            // int colour_index = (int)(100*(success_rate-67)/33);
+
+            int colour_index = (int)(100*(success_rate-67)/33);
+            colour_code_stream << "ff";
+            if(colour_index < 16){
+                colour_code_stream << "0";
+            }
+            colour_code_stream << std::hex << (int)(std::max(0, colour_index));
+            if(colour_index < 16){
+                colour_code_stream << "0";
+            }
+            colour_code_stream << std::hex << (int)(std::max(0, colour_index));
+
         } else if (success_rate<=66){
+            colour_code_stream<<"#";
             BOOST_LOG_TRIVIAL(trace)<<"colour index green: "<<(int)((success_rate-33)*255/33);
-            colour_code_stream << "00";
-            colour_code_stream << std::hex << (int)((success_rate-33)*255/33);
-            colour_code_stream << "00";
+            // colour_code_stream << std::hex << (int)((success_rate-33)*255/33);
+            // colour_code_stream << "00";
+            // int colour_index = (int)(100-(100*(success_rate-67)/33));
+
+            int colour_index = (int)(100-(100*(success_rate-67)/33));
+            if(colour_index < 16){
+                colour_code_stream << "0";
+            }
+            colour_code_stream << "ff";
+            colour_code_stream << std::hex << (int)(std::max(0, colour_index));
+            if(colour_index < 16){
+                colour_code_stream << "0";
+            }
+            colour_code_stream << std::hex << (int)(std::max(0, colour_index));
+
         } else {
-            BOOST_LOG_TRIVIAL(trace)<<"colour index blue: "<<(int)((success_rate-67)*255/33);
-            colour_code_stream << "0000";
-            colour_code_stream << std::hex << (int)((success_rate-67)*255/33);
+            colour_code_stream<<"#";
+            BOOST_LOG_TRIVIAL(trace)<<"colour index blue: "<<(int)((success_rate-67)/33);
+
+            int colour_index = (int)(100-(100*(success_rate-67)/33));
+            if(colour_index < 16){
+                colour_code_stream << "0";
+            }
+            colour_code_stream << std::hex << (int)(std::max(0, colour_index));
+            if(colour_index < 16){
+                colour_code_stream << "0";
+            }
+            colour_code_stream << std::hex << (int)(std::max(0, colour_index));
+            colour_code_stream << "ff";
         }
         colour_code = colour_code_stream.str();
 
         BOOST_LOG_TRIVIAL(trace)<<colour_code;
         
-        dot_file<<s->data.label<<"_"<<s->data.node_id<<" [ shape=circle, style=filled, fontcolor=white, fillcolor=\""<<colour_code<<"\" ];"<<std::endl;        
+        // dot_file<<s->data.label<<"_"<<s->data.node_id<<" [ shape=none"
+        //                         <<", style=filled"
+        //                         <<", fontcolor=white"
+        //                         <<", fillcolor=\""<<colour_code<<"\""
+        //                         <<"];";
+
+        dot_file<<s->data.label<<"_"<<s->data.node_id<<" [ shape=none"
+                                <<", style=filled"
+                                <<", fontcolor=white"
+                                <<", fillcolor=\""<<colour_code<<"\""
+                                <<", label=<"<<std::endl
+                                <<"<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\">"<<std::endl
+                                    <<"<TR>"
+                                        <<"<TD>"<<s->data.node_id<<"</TD><TD COLSPAN=\"2\">"<<s->data.label<<"</TD>"
+                                    <<"</TR>"<<std::endl
+                                    <<"<TR>"<<std::endl
+                                        <<"<TD>"<<s->data.students_successful.size()<<"</TD>"<<std::endl
+                                        <<"<TD>"<<s->data.students.size()<<"</TD>"<<std::endl
+                                        <<"<TD>"<<success_rate<<"</TD>"<<std::endl
+                                    <<"</TR>"<<std::endl
+                                <<"</TABLE>>"
+                                <<"];"<<std::endl;        
     }
 }
 

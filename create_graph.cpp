@@ -21,15 +21,16 @@ int main(int argc, char** argv)
 {
     // Number of students to consider
     uint subset_count = 99999;
+    int logging_level = logging::trivial::info;
+    bool bayes_nodes = false;
 
     po::options_description desc("Options");
     desc.add_options()
         ("help", "Print help messages")
         ("debug", "Enable debug level logging; if multiple level present lowest is taken")
         ("trace", "Enable trace level logging(gruesome details); if multiple level present lowest is taken")
+        ("bayes_nodes", "Each node will only be added as child")
         ("subset_count,n", po::value<uint>(), "subset count of students to consider");
-
-    int logging_level = logging::trivial::info;
     
     // Declare and parse command line argument
     po::variables_map params;
@@ -46,6 +47,10 @@ int main(int argc, char** argv)
 
     if( params.count("trace") ) {
         logging_level = logging::trivial::trace;
+    }
+
+    if( params.count("bayes_nodes") ){
+        bayes_nodes = true;
     }
 
     if( params.count("subset_count")) {
@@ -134,14 +139,16 @@ int main(int argc, char** argv)
             int sequence_number = 0;
             bool make_transition = true;
             std::string current_year = studentCourseData[0][12];
-            Node *current_node = &root;
-            Node *prev_node = NULL;
-            bool successful_student = false;
+            std::vector<Node*> current_nodes;
+            bool successful_student = (studentCourseData[0][31].compare("1")==0);
+            std::vector<Node*> waiting_nodes;
+
+            BOOST_LOG_TRIVIAL(trace)<<"Adding ROOT to current nodes";
+            current_nodes.push_back(&root);
 
             for(std::vector<std::string> course : studentCourseData){
-                successful_student = (course[31].compare("1")==0);
                 
-                BOOST_LOG_TRIVIAL(trace)<<"Parsing course data "<<course[3]<<" success: "<<course[31];
+                BOOST_LOG_TRIVIAL(trace)<<"*********** Parsing course data "<<course[3]<<"-"<<course[4]<<" success: "<<course[31];
                 
                 for(int i=0; i<course.size(); i++){
                     BOOST_LOG_TRIVIAL(trace)<<i<<":"<<course[i]<<" ";
@@ -150,7 +157,8 @@ int main(int argc, char** argv)
                 if(course[12].compare(current_year) != 0){
                     current_year = course[12];
                     sequence_number ++;
-                    current_node = prev_node;
+                    current_nodes = waiting_nodes;
+                    waiting_nodes.clear();
                     make_transition = true;
                 }
                 
@@ -159,11 +167,13 @@ int main(int argc, char** argv)
                 course_data.label = course[3];
                 course_data.node_id = stoll(course[4]);
 
-                prev_node = graph.addNode(a, current_node, course_data, sequence_number, true, successful_student);
+                waiting_nodes.push_back(graph.addNode(a, current_nodes, course_data, sequence_number, !bayes_nodes, successful_student));
                 BOOST_LOG_TRIVIAL(trace)<<"Add node complete";
                 make_transition=false;
             
             }
+            BOOST_LOG_TRIVIAL(debug)<<"Connecting END";
+            graph.connectEND(a, waiting_nodes, successful_student);
         }
         else{
             BOOST_LOG_TRIVIAL(fatal)<<"Courses filtered for students does not contain any record";
@@ -176,9 +186,9 @@ int main(int argc, char** argv)
         // break;    
     }
     
-    BOOST_LOG_TRIVIAL(trace)<<"Connecting END...";
+    BOOST_LOG_TRIVIAL(trace)<<"Wrap UP Computations...";
     graph.wrap_up();
-    BOOST_LOG_TRIVIAL(trace)<<"END connection complete";
+    BOOST_LOG_TRIVIAL(trace)<<"Wrap UP Computations Complete";
 
     BOOST_LOG_TRIVIAL(debug)<<"Creating graph Done";
 
@@ -186,7 +196,7 @@ int main(int argc, char** argv)
     // graph.bfsParse();
     // BOOST_LOG_TRIVIAL(debug)<<"BFS output done...";
 
-    graph.initializeGraph();
+    // graph.initializeGraph();
 
     BOOST_LOG_TRIVIAL(info)<<"Creating dot file...";
     graph.printGraph();

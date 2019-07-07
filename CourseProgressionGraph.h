@@ -32,8 +32,9 @@ class CourseProgressionGraph
     // public:
         CourseProgressionGraph(Node* rootp, Node* endp);
 
-        Node* addNode(std::string student_id, Node* current_node, Node::Data data, int sequence_number, bool full_match, bool successful);
+        Node* addNode(std::string student_id, std::vector<Node*> current_nodes, Node::Data data, int sequence_number, bool full_match, bool successful);
         void wrap_up();
+        void connectEND(std::string sid, std::vector<Node*> nodes, bool successful);
         
         std::vector<Node*> getBfsParse();
         Node* bfsSearch(Node::Data data);
