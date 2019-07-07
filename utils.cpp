@@ -15,3 +15,12 @@ void findAndReplaceAll(std::string & data, std::string toSearch, std::string rep
 		pos =data.find(toSearch, pos + replaceStr.size());
 	}
 }
+
+
+void sanitizeDOTEntry(std::string &val){
+	findAndReplaceAll(val, "&", "_AND_");
+	findAndReplaceAll(val, " ", "_");
+	findAndReplaceAll(val, "/", "_OR_");
+	findAndReplaceAll(val, "-", "_");
+	findAndReplaceAll(val, ".", "_");
+}

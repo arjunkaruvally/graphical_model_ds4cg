@@ -13,11 +13,12 @@ class Node
         struct Data{
             std::string label;
             uint node_id;
+            std::vector<std::string> students;
+            std::vector<std::string> students_successful;
         }data;
         // std::string label;
         // uint node_id;
         uint sequence_number;
-        std::vector<std::string> students;
         std::vector<Node*> children;
         std::vector<Node*> parents;
 
@@ -32,8 +33,10 @@ class Node
         std::vector<Node*> getAllChildren();
         
         //Setter functions
-        bool addStudent(std::string id);
+        bool addStudents(std::vector<std::string> id);
+        bool addSuccessfulStudent(std::string id);
         bool addChildNode(Node* obj);
         bool addParentNode(Node* obj);
         bool memberOf(Node* obj, std::vector<Node*> vec);
+        bool memberOf(std::string obj, std::vector<std::string> vec);
 };

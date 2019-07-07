@@ -34,15 +34,45 @@ int Node::getSequenceNumber(){
 }
 
 
-bool Node::addStudent(std::string id){
-    BOOST_LOG_TRIVIAL(trace)<<"Pushing student id: "<<id<<"...";
-    this->students.push_back(id);
-    
+bool Node::addStudents(std::vector<std::string> ids){
+    for(std::string id : ids){
+        BOOST_LOG_TRIVIAL(trace)<<"Pushing student id: "<<id<<"...";
+        if(!memberOf(id, this->data.students)){
+            this->data.students.push_back(id);
+            BOOST_LOG_TRIVIAL(trace)<<"added to list";
+        }
+        BOOST_LOG_TRIVIAL(trace)<<"duplicate exist";
+    }
     return true;
 }
 
+
+bool Node::addSuccessfulStudent(std::string id){
+    BOOST_LOG_TRIVIAL(trace)<<"Pushing successful student id: "<<id<<"...";
+    if(!memberOf(id, this->data.students_successful)){
+        this->data.students_successful.push_back(id);
+        BOOST_LOG_TRIVIAL(trace)<<"added to list";
+        return true;
+    }
+    BOOST_LOG_TRIVIAL(trace)<<"duplicate exist";
+    return false;
+}
+
+
+bool Node::memberOf(std::string obj, std::vector<std::string> vec){
+    BOOST_LOG_TRIVIAL(trace)<<"Calculating memberOf<string>";
+    for(std::string member : vec){
+        BOOST_LOG_TRIVIAL(trace)<<"comparing "<<member<<" and "<<obj;
+        if(obj.compare(member)==0){
+            return true;
+        }
+    }
+    return false;
+}
+
+
 bool Node::memberOf(Node* obj, std::vector<Node*> vec){
-    BOOST_LOG_TRIVIAL(trace)<<"Calculating memberOf";
+    BOOST_LOG_TRIVIAL(trace)<<"Calculating memberOf<Node*>";
     for(Node* member : vec){
         BOOST_LOG_TRIVIAL(trace)<<"comparing "<<member->data.label<<" and "<<obj->data.label;
         if(member->data.node_id==obj->data.node_id){

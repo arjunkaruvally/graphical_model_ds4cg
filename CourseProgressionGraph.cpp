@@ -25,6 +25,8 @@ CourseProgressionGraph::CourseProgressionGraph(Node* rootp, Node* endp){
     number_of_vertices = 2;
     course_map.insert(std::pair<int, std::string>(0, "ROOT"));
     course_map.insert(std::pair<int, std::string>(1, "END"));
+    vertex_dict.insert(std::pair<int, Node*>(0, root));
+    vertex_dict.insert(std::pair<int, Node*>(1, end));   
 }
 
 // Find value in an array of values
@@ -33,9 +35,10 @@ bool CourseProgressionGraph::valueIn(Node* val, std::vector<Node*> array){
 }
 
 // Think if this is required
-void CourseProgressionGraph::bfsParse(){
+std::vector<Node*> CourseProgressionGraph::getBfsParse(){
     // BFS show output the graph
 
+    std::vector<Node*> result;
     std::vector<Node*> visited;
     std::vector<Node*> queue;
     Node* s=NULL;
@@ -50,7 +53,9 @@ void CourseProgressionGraph::bfsParse(){
 
     while(queue.size()>0){
         s = queue[0];
-        BOOST_LOG_TRIVIAL(info)<<s->getLabel();
+        
+        result.push_back(s);
+
         queue.erase(queue.begin());
 
         for(Node* child : s->getAllChildren()){
@@ -62,7 +67,9 @@ void CourseProgressionGraph::bfsParse(){
     }
 
     BOOST_LOG_TRIVIAL(trace)<<"BFS Parse Done";
+    return result;
 }
+
 
 // Think if this is required
 Node* CourseProgressionGraph::bfsSearch(Node::Data data){
@@ -105,7 +112,7 @@ Node* CourseProgressionGraph::bfsSearch(Node::Data data){
 }
 
 
-Node* CourseProgressionGraph::addNode(std::string student_id, Node* current_node, Node::Data data, int sequence_number, bool full_match=false){
+Node* CourseProgressionGraph::addNode(std::string student_id, Node* current_node, Node::Data data, int sequence_number, bool full_match=false, bool successful=false){
     Node* node=NULL;
     BOOST_LOG_TRIVIAL(trace)<<"Step 1: Searching for existing nodes";
     ///////// Step 1: Search for the node
@@ -115,7 +122,7 @@ Node* CourseProgressionGraph::addNode(std::string student_id, Node* current_node
         for(uint i=0; i<node_children.size(); i++){
             Node* child=node_children[i];
             BOOST_LOG_TRIVIAL(trace)<<"Comparing "<<child->getLabel()<<" with "<<data.label;
-            if(child->getLabel().compare(data.label)==0){
+            if(child->data.node_id==data.node_id){
                 BOOST_LOG_TRIVIAL(trace)<<"Match Found";
                 node=child;
                 break;
@@ -132,17 +139,19 @@ Node* CourseProgressionGraph::addNode(std::string student_id, Node* current_node
         node = new Node(data);
 
         //Sanitize dot file
-        findAndReplaceAll(data.label, "&", "_AND_");
-        findAndReplaceAll(data.label, " ", "_");
-        findAndReplaceAll(data.label, "/", "_OR_");
+        sanitizeDOTEntry(data.label);
 
         course_map.insert(std::pair<int, std::string>(data.node_id, data.label));
+        vertex_dict.insert(std::pair<int, Node*>(data.node_id, node));
         number_of_vertices ++;
     }
 
     BOOST_LOG_TRIVIAL(trace)<<"adding student to node...";
     // Add student to node
-    node->addStudent(student_id);
+    node->addStudents(std::vector<std::string>(1, student_id));
+    if(successful) {
+        node->addSuccessfulStudent(student_id);
+    }
     
     BOOST_LOG_TRIVIAL(trace)<<"Step 3: Making changes to graph...";;
 
@@ -158,23 +167,70 @@ Node* CourseProgressionGraph::addNode(std::string student_id, Node* current_node
 }
 
 
-void CourseProgressionGraph::wrap_up(std::string student_id, Node* current_node){
-    current_node->addChildNode(end);
-    end->addStudent(student_id);
+void CourseProgressionGraph::wrap_up(){
 
-    edge_array.push_back(Edge(current_node->data.node_id, end->data.node_id));
+    for(auto const& x : vertex_dict){
+        Node* node=x.second;
+
+        if(node->children.size()==0 || (node->children.size()==1 && (node->children[0]->data.node_id == node->data.node_id))){
+            end->addStudents(std::vector<std::string>(1, node->data.label));
+            node->addChildNode(end);
+            edge_array.push_back(Edge(node->data.node_id, end->data.node_id));
+        }
+    }
 }
 
+
 void CourseProgressionGraph::initializeGraph(){
-    BOOST_LOG_TRIVIAL(trace)<<"Creating graph visualization";
-    graph_visualization = Graph(number_of_vertices);
+    BOOST_LOG_TRIVIAL(trace)<<"Intiializing boost graph. vertex count: "<<number_of_vertices;
+    this->boost_graph = Graph(number_of_vertices);
 
     BOOST_LOG_TRIVIAL(debug)<<"Edges to add: "<<edge_array.size();
     for(Edge edge : edge_array){
-        add_edge(edge.first, edge.second, graph_visualization);
+        BOOST_LOG_TRIVIAL(trace)<<"adding edge: "<<edge.first<<" -> "<<edge.second;
+        // add_edge(edge.first, edge.second, this->boost_graph);
+        BOOST_LOG_TRIVIAL(trace)<<"adding edge done";
         // std::cout<<edge.first<<" -> "<<edge.second<<";"<<std::endl;
     }
     BOOST_LOG_TRIVIAL(trace)<<"Graph visualization done";
+}
+
+
+void CourseProgressionGraph::nodeDOT(std::ofstream &dot_file){
+    std::vector<Node*> node_list = getBfsParse();
+
+    for(auto const& x : vertex_dict){
+        Node* s = x.second;
+        sanitizeDOTEntry(s->data.label);
+        float success_rate=((float)s->data.students_successful.size())/((float)s->data.students.size())*100;
+        std::stringstream colour_code_stream;
+        std::string colour_code;
+
+        colour_code_stream<<"#";
+
+        BOOST_LOG_TRIVIAL(trace)<<"Node: "<<s->data.label<<"_"<<s->data.node_id<<" success_rate: "<<success_rate<<" total_succ: "
+                            <<s->data.students_successful.size()<<" total_students: "<<s->data.students.size();
+
+        if(success_rate<=33){
+            BOOST_LOG_TRIVIAL(trace)<<"colour index red: "<<(int)(255-(success_rate*255/33));
+            colour_code_stream << std::hex << (int)(255-(success_rate*255/33));
+            colour_code_stream << "0000";
+        } else if (success_rate<=66){
+            BOOST_LOG_TRIVIAL(trace)<<"colour index green: "<<(int)((success_rate-33)*255/33);
+            colour_code_stream << "00";
+            colour_code_stream << std::hex << (int)((success_rate-33)*255/33);
+            colour_code_stream << "00";
+        } else {
+            BOOST_LOG_TRIVIAL(trace)<<"colour index blue: "<<(int)((success_rate-67)*255/33);
+            colour_code_stream << "0000";
+            colour_code_stream << std::hex << (int)((success_rate-67)*255/33);
+        }
+        colour_code = colour_code_stream.str();
+
+        BOOST_LOG_TRIVIAL(trace)<<colour_code;
+        
+        dot_file<<s->data.label<<"_"<<s->data.node_id<<" [ shape=circle, style=filled, fontcolor=white, fillcolor=\""<<colour_code<<"\" ];"<<std::endl;        
+    }
 }
 
 void CourseProgressionGraph::printGraph(){
@@ -186,6 +242,9 @@ void CourseProgressionGraph::printGraph(){
     for(Edge edge : edge_array){
         dot_file<<course_map[edge.first]<<"_"<<edge.first<<" -> "<<course_map[edge.second]<<"_"<<edge.second<<";"<<std::endl;
     }
+
+    // node specific dot values
+    nodeDOT(dot_file);
 
     dot_file<<"}"<<std::endl;
 

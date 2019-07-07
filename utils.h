@@ -3,3 +3,4 @@
 #include <string>
 
 void findAndReplaceAll(std::string & data, std::string toSearch, std::string replaceStr);
+void sanitizeDOTEntry(std::string &val);

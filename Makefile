@@ -5,7 +5,7 @@
 
 CXX = g++
 CXXFLAGS = -std=c++11 -Wall -pedantic -g -O0 -DBOOST_LOG_DYN_LINK
-LXXFLAGS = -lpthread -lboost_log -lboost_system
+LXXFLAGS = -lpthread -lboost_log -lboost_system -lboost_program_options
 
 # ****************************************************
 # Targets needed to bring the executable up to date
